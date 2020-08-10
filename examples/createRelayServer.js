@@ -5,17 +5,20 @@
 	node "/Users/alexwang/Documents/workspace/github/simple-socks-copy/examples/createServer.js"
 	
 	(2) 创建 TCP 转发
-	node "/Users/alexwang/Documents/workspace/github/simple-socks-copy/examples/forwarder.js" 1080 127.0.0.1:1081
+	// node "/Users/alexwang/Documents/workspace/github/simple-socks-copy/examples/forwarder.js" 1080 127.0.0.1:1081
+	// supervisor --inspect examples/createRelayServer.js
+	node examples/createRelayServer.js
 
 	(3) 测试网页
 	curl http://www.baidu.com --socks5 127.0.0.1:1080
+
 */
+const socks5 = require('../src/socks5');
+const server = socks5.createServer({
+	connectionRelay: { proxyHost: '127.0.0.1', proxyPort: 1081 }
+})
 
-const
-	socks5 = require('../src/socks5'),
-	server = socks5.createServer();
-
-// start listening!
+	// start listening!
 server.listen(1080);
 
 server.on('handshake', function (socket) {

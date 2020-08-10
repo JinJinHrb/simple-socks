@@ -1,3 +1,8 @@
+/* eslint-disable no-magic-numbers */
+/* eslint-disable no-console */
+/* eslint-disable handle-callback-err */
+/* eslint-disable object-shorthand */
+/* eslint-disable sort-vars */
 const
 	dns = require('dns'),
 	socks5 = require('../dist/socks5'),

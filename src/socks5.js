@@ -1,4 +1,6 @@
-import {
+// 参考 https://github.com/mscdex/socksv5
+
+const {
 	RFC_1928_ATYP,
 	RFC_1928_COMMANDS,
 	RFC_1928_METHODS,
@@ -6,11 +8,13 @@ import {
 	RFC_1928_VERSION,
 	RFC_1929_REPLIES,
 	RFC_1929_VERSION
-} from './constants';
+} = require('./constants');
 
-import binary from 'binary';
-import domain from 'domain';
-import net from 'net';
+const binary = require('binary');
+const domain = require('domain');
+const net = require('net');
+const socksv5 = require('./socksv5/client.js');
+const SOCKSV5_AUTH_NONE = require('./socksv5/auth/None.js')();
 
 	// module specific events
 const
@@ -122,106 +126,190 @@ class SocksServer {
 				let binaryStream = binary.stream(buffer);
 
 				binaryStream
-					.word8('ver')
-					.word8('cmd')
-					.word8('rsv')
-					.word8('atyp')
-					.tap((args) => {
-						// capture the raw buffer
-						args.requestBuffer = buffer;
+				.word8('ver')
+				.word8('cmd')
+				.word8('rsv')
+				.word8('atyp')
+				.tap((args) => {
+					// capture the raw buffer
+					args.requestBuffer = buffer;
 
-						// verify version is appropriate
-						if (args.ver !== RFC_1928_VERSION) {
-							return end(RFC_1928_REPLIES.GENERAL_FAILURE, args);
-						}
+					// verify version is appropriate
+					if (args.ver !== RFC_1928_VERSION) {
+						return end(RFC_1928_REPLIES.GENERAL_FAILURE, args);
+					}
 
-						// append socket to active sessions
-						self.activeSessions.push(socket);
+					// append socket to active sessions
+					self.activeSessions.push(socket);
 
-						// create dst
-						args.dst = {};
+					// create dst
+					args.dst = {};
 
-						// ipv4
-						if (args.atyp === RFC_1928_ATYP.IPV4) {
-							binaryStream
-								.buffer('addr.buf', LENGTH_RFC_1928_ATYP)
-								.tap((args) => {
-									args.dst.addr = [].slice.call(args.addr.buf).join('.');
-								});
-
-						// domain name
-						} else if (args.atyp === RFC_1928_ATYP.DOMAINNAME) {
-							binaryStream
-								.word8('addr.size')
-								.buffer('addr.buf', 'addr.size')
-								.tap((args) => {
-									args.dst.addr = args.addr.buf.toString();
-								});
-
-						// ipv6
-						} else if (args.atyp === RFC_1928_ATYP.IPV6) {
-							binaryStream
-								.word32be('addr.a')
-								.word32be('addr.b')
-								.word32be('addr.c')
-								.word32be('addr.d')
-								.tap((args) => {
-									args.dst.addr = [];
-
-									// extract the parts of the ipv6 address
-									['a', 'b', 'c', 'd'].forEach((x) => {
-										x = args.addr[x];
-
-										// convert DWORD to two WORD values and append
-										/* eslint no-magic-numbers : 0 */
-										args.dst.addr.push(((x & 0xffff0000) >> 16).toString(16));
-										args.dst.addr.push(((x & 0xffff)).toString(16));
-									});
-
-									// format ipv6 address as string
-									args.dst.addr = args.dst.addr.join(':');
-								});
-
-						// unsupported address type
-						} else {
-							return end(RFC_1928_REPLIES.ADDRESS_TYPE_NOT_SUPPORTED, args);
-						}
-					})
-					.word16bu('dst.port')
-					.tap((args) => {
-						if (args.cmd === RFC_1928_COMMANDS.CONNECT) {
-							let
-								connectionFilter = self.options.connectionFilter,
-								connectionFilterDomain = domain.create();
-
-							// if no connection filter is provided, stub one
-							if (!connectionFilter || typeof connectionFilter !== 'function') {
-								connectionFilter = (destination, origin, callback) => setImmediate(callback);
-							}
-
-							// capture connection filter errors
-							connectionFilterDomain.on('error', (err) => {
-								// emit failed destination connection event
-								self.server.emit(
-									EVENTS.CONNECTION_FILTER,
-									// destination
-									{
-										address : args.dst.addr,
-										port : args.dst.port
-									},
-									// origin
-									{
-										address : socket.remoteAddress,
-										port : socket.remotePort
-									},
-									err);
-
-								// respond with failure
-								return end(RFC_1929_REPLIES.CONNECTION_NOT_ALLOWED, args);
+					// ipv4
+					if (args.atyp === RFC_1928_ATYP.IPV4) {
+						binaryStream
+							.buffer('addr.buf', LENGTH_RFC_1928_ATYP)
+							.tap((args) => {
+								args.dst.addr = [].slice.call(args.addr.buf).join('.');
 							});
 
-							// perform connection
-							return connectionFilter(
+					// domain name
+					} else if (args.atyp === RFC_1928_ATYP.DOMAINNAME) {
+						binaryStream
+							.word8('addr.size')
+							.buffer('addr.buf', 'addr.size')
+							.tap((args) => {
+								args.dst.addr = args.addr.buf.toString();
+							});
+
+					// ipv6
+					} else if (args.atyp === RFC_1928_ATYP.IPV6) {
+						binaryStream
+							.word32be('addr.a')
+							.word32be('addr.b')
+							.word32be('addr.c')
+							.word32be('addr.d')
+							.tap((args) => {
+								args.dst.addr = [];
+
+								// extract the parts of the ipv6 address
+								['a', 'b', 'c', 'd'].forEach((x) => {
+									x = args.addr[x];
+
+									// convert DWORD to two WORD values and append
+									/* eslint no-magic-numbers : 0 */
+									args.dst.addr.push(((x & 0xffff0000) >> 16).toString(16));
+									args.dst.addr.push(((x & 0xffff)).toString(16));
+								});
+
+								// format ipv6 address as string
+								args.dst.addr = args.dst.addr.join(':');
+							});
+
+					// unsupported address type
+					} else {
+						return end(RFC_1928_REPLIES.ADDRESS_TYPE_NOT_SUPPORTED, args);
+					}
+				})
+				.word16bu('dst.port')
+				.tap((args) => {
+					if (args.cmd === RFC_1928_COMMANDS.CONNECT) {
+						const connectionRelay = self.options.connectionRelay || {};
+						let connectionFilter = self.options.connectionFilter;
+						let connectionFilterDomain = domain.create();
+
+						const connectionFilterCallback = connectionFilterDomain.intercept(() => {
+							let destination;
+							
+							// 判断是否是中继节点 START
+							const { proxyHost, proxyPort, auths = [SOCKSV5_AUTH_NONE] } = connectionRelay;
+							if(proxyHost && proxyPort){
+								const destHost = args.dst.addr;
+								const destPort = args.dst.port;
+								destination = socksv5.connect({
+										host: destHost, // 'google.com'
+										port: destPort, // 80
+										proxyHost, // '127.0.0.1',
+										proxyPort, // 1080,
+										// eslint-disable-next-line sort-keys
+										auths
+									},
+									function (clisocket) {
+										destination = clisocket;
+										console.log('#216 >> Connection successful');
+										// clisocket.write('GET /node.js/rules HTTP/1.0\r\n\r\n');
+										// clisocket.pipe(process.stdout);
+										let responseBuffer = Buffer.alloc(args.requestBuffer.length);
+										args.requestBuffer.copy(responseBuffer);
+										responseBuffer[1] = RFC_1928_REPLIES.SUCCEEDED;
+
+										// write acknowledgement to client...
+										socket.write(responseBuffer, () => {
+											// listen for data bi-directionally
+											destination.pipe(socket);
+											socket.pipe(destination);
+										});
+										
+									}
+								);
+								// 判断是否是中继节点 END
+							} else {
+								destination = net.createConnection(
+									args.dst.port,
+									args.dst.addr,
+									() => {
+										// prepare a success response
+										let responseBuffer = Buffer.alloc(args.requestBuffer.length);
+										args.requestBuffer.copy(responseBuffer);
+										responseBuffer[1] = RFC_1928_REPLIES.SUCCEEDED;
+
+										// write acknowledgement to client...
+										socket.write(responseBuffer, () => {
+											// listen for data bi-directionally
+											destination.pipe(socket);
+											socket.pipe(destination);
+										});
+									}
+								);
+							}
+
+							// capture successful connection
+							destination.on('connect', () => {
+								let info = {
+									address : args.dst.addr,
+									port : args.dst.port
+								};
+
+								// emit connection event
+								self.server.emit(EVENTS.PROXY_CONNECT, info, destination);
+
+								// capture and emit proxied connection data
+								destination.on('data', (data) => {
+									self.server.emit(EVENTS.PROXY_DATA, data);
+								});
+
+								connectionFilterDomain.exit();
+							});
+
+							// capture connection errors and response appropriately
+							destination.on('error', (err) => {
+								// exit the connection filter domain
+								connectionFilterDomain.exit();
+
+								// notify of connection error
+								err.addr = args.dst.addr;
+								err.atyp = args.atyp;
+								err.port = args.dst.port;
+
+								self.server.emit(EVENTS.PROXY_ERROR, err);
+
+								if (err.code && err.code === 'EADDRNOTAVAIL') {
+									return end(RFC_1928_REPLIES.HOST_UNREACHABLE, args);
+								}
+
+								if (err.code && err.code === 'ECONNREFUSED') {
+									return end(RFC_1928_REPLIES.CONNECTION_REFUSED, args);
+								}
+
+								return end(RFC_1928_REPLIES.NETWORK_UNREACHABLE, args);
+							});
+
+						});
+
+						if(connectionRelay && typeof connectionRelay === 'object'){
+							// eslint-disable-next-line babel/new-cap
+						}
+
+						// if no connection filter is provided, stub one
+						if (!connectionFilter || typeof connectionFilter !== 'function') {
+							connectionFilter = (destination, origin, callback) => setImmediate(callback);
+						}
+
+						// capture connection filter errors
+						connectionFilterDomain.on('error', (err) => {
+							// emit failed destination connection event
+							self.server.emit(
+								EVENTS.CONNECTION_FILTER,
 								// destination
 								{
 									address : args.dst.addr,
@@ -232,70 +320,31 @@ class SocksServer {
 									address : socket.remoteAddress,
 									port : socket.remotePort
 								},
-								connectionFilterDomain.intercept(() => {
-									let destination = net.createConnection(
-										args.dst.port,
-										args.dst.addr,
-										() => {
-											// prepare a success response
-											let responseBuffer = Buffer.alloc(args.requestBuffer.length);
-											args.requestBuffer.copy(responseBuffer);
-											responseBuffer[1] = RFC_1928_REPLIES.SUCCEEDED;
+								err);
 
-											// write acknowledgement to client...
-											socket.write(responseBuffer, () => {
-												// listen for data bi-directionally
-												destination.pipe(socket);
-												socket.pipe(destination);
-											});
-										});
+							// respond with failure
+							return end(RFC_1929_REPLIES.CONNECTION_NOT_ALLOWED, args);
+						});
 
-									// capture successful connection
-									destination.on('connect', () => {
-										let info = {
-											address : args.dst.addr,
-											port : args.dst.port
-										};
-
-										// emit connection event
-										self.server.emit(EVENTS.PROXY_CONNECT, info, destination);
-
-										// capture and emit proxied connection data
-										destination.on('data', (data) => {
-											self.server.emit(EVENTS.PROXY_DATA, data);
-										});
-
-										connectionFilterDomain.exit();
-									});
-
-									// capture connection errors and response appropriately
-									destination.on('error', (err) => {
-										// exit the connection filter domain
-										connectionFilterDomain.exit();
-
-										// notify of connection error
-										err.addr = args.dst.addr;
-										err.atyp = args.atyp;
-										err.port = args.dst.port;
-
-										self.server.emit(EVENTS.PROXY_ERROR, err);
-
-										if (err.code && err.code === 'EADDRNOTAVAIL') {
-											return end(RFC_1928_REPLIES.HOST_UNREACHABLE, args);
-										}
-
-										if (err.code && err.code === 'ECONNREFUSED') {
-											return end(RFC_1928_REPLIES.CONNECTION_REFUSED, args);
-										}
-
-										return end(RFC_1928_REPLIES.NETWORK_UNREACHABLE, args);
-									});
-								}));
-						} else {
-							// bind and udp associate commands
-							return end(RFC_1928_REPLIES.SUCCEEDED, args);
-						}
-					});
+						// perform connection
+						return connectionFilter(
+							// destination
+							{
+								address : args.dst.addr,
+								port : args.dst.port
+							},
+							// origin
+							{
+								address : socket.remoteAddress,
+								port : socket.remotePort
+							},
+							connectionFilterCallback
+						);
+					} else {
+						// bind and udp associate commands
+						return end(RFC_1928_REPLIES.SUCCEEDED, args);
+					}
+				});
 			}
 
 			/**
