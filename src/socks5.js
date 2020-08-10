@@ -13,7 +13,7 @@ const {
 const binary = require('binary');
 const domain = require('domain');
 const net = require('net');
-const socksv5 = require('./socksv5/client.js');
+const client = require('./socksv5/client.js');
 const SOCKSV5_AUTH_NONE = require('./socksv5/auth/None.js')();
 
 	// module specific events
@@ -206,7 +206,7 @@ class SocksServer {
 							if(proxyHost && proxyPort){
 								const destHost = args.dst.addr;
 								const destPort = args.dst.port;
-								destination = socksv5.connect({
+								destination = client.connect({
 										host: destHost, // 'google.com'
 										port: destPort, // 80
 										proxyHost, // '127.0.0.1',
