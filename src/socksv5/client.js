@@ -70,7 +70,7 @@ Client.prototype._onConnect = function () {
 
 	var auths = self._auths;
 	let alen = auths.length;
-	let authsbuf = new Buffer(2 + alen);
+	let authsbuf = Buffer.alloc(2 + alen);
 	authsbuf[0] = 0x05;
 	authsbuf[1] = alen;
 	for ( let a = 0, p = 2; a < alen; ++a, ++p ){
@@ -131,7 +131,7 @@ Client.prototype._sendRequest = function () {
 		// eslint-disable-next-line no-magic-numbers
 		: (iptype === 4 ? 4 : 16)),
 		// eslint-disable-next-line no-magic-numbers
-		reqbuf = new Buffer(6 + (iptype === 0 ? 1 : 0) + addrlen);
+		reqbuf = Buffer.alloc(6 + (iptype === 0 ? 1 : 0) + addrlen);
 	let p;
 	reqbuf[0] = 0x05;
 	reqbuf[1] = CMD.CONNECT;

@@ -13,8 +13,9 @@ const {
 const binary = require('binary');
 const domain = require('domain');
 const net = require('net');
-const client = require('./socksv5/client.js');
+const Client = require('./socksv5/client.js');
 const SOCKSV5_AUTH_NONE = require('./socksv5/auth/None.js')();
+// const hdlUtil = require('./helpers/hdlUtil.js');
 
 	// module specific events
 const
@@ -29,6 +30,31 @@ const
 		PROXY_ERROR : 'proxyError'
 	},
 	LENGTH_RFC_1928_ATYP = 4;
+
+/* 
+ * 尝试复用
+const RELAY_SOCKET_POOL = {}; // 保留与下一个节点的通信
+const setRelaySocketPool = function (proxyHost, proxyPort, clisocket){
+	const sid = `${proxyHost}:${proxyPort}`;
+	const existClisocket = hdlUtil.getDeepVal(RELAY_SOCKET_POOL, [sid, 'clisocket']);
+	if(existClisocket){
+		try{
+			existClisocket.end();
+		}catch(e){
+			existClisocket.destroy();
+		}
+	}
+	if(!RELAY_SOCKET_POOL[sid]){
+		RELAY_SOCKET_POOL[sid] = {};
+	}
+	hdlUtil.setDeepVal(RELAY_SOCKET_POOL, [sid, 'clisocket'], clisocket);
+	hdlUtil.setDeepVal(RELAY_SOCKET_POOL, [sid, 'updatedAt'], new Date());
+}
+const getRelaySocketPool = function (proxyHost, proxyPort) {
+	const sid = `${proxyHost}:${proxyPort}`;
+	return hdlUtil.getDeepVal(RELAY_SOCKET_POOL, [sid, 'clisocket']);
+}
+ */
 
 /**
  * The following RFCs may be useful as background:
@@ -46,6 +72,19 @@ class SocksServer {
 		this.server = net.createServer((socket) => {
 			socket.on('error', (err) => {
 				self.server.emit(EVENTS.PROXY_ERROR, err);
+				try{
+					socket.end();
+				}catch(e){
+					socket.destroy();
+				}
+			});
+
+			socket.on('end', () => {
+				try{
+					socket.end();
+				}catch(e){
+					socket.destroy();
+				}
 			});
 
 			/**
@@ -124,7 +163,6 @@ class SocksServer {
 			 **/
 			function connect (buffer) {
 				let binaryStream = binary.stream(buffer);
-
 				binaryStream
 				.word8('ver')
 				.word8('cmd')
@@ -199,42 +237,56 @@ class SocksServer {
 						let connectionFilterDomain = domain.create();
 
 						const connectionFilterCallback = connectionFilterDomain.intercept(() => {
-							let destination;
-							
 							// 判断是否是中继节点 START
 							const { proxyHost, proxyPort, auths = [SOCKSV5_AUTH_NONE] } = connectionRelay;
 							if(proxyHost && proxyPort){
-								const destHost = args.dst.addr;
-								const destPort = args.dst.port;
-								destination = client.connect({
-										host: destHost, // 'google.com'
-										port: destPort, // 80
-										proxyHost, // '127.0.0.1',
-										proxyPort, // 1080,
-										// eslint-disable-next-line sort-keys
-										auths
-									},
-									function (clisocket) {
-										destination = clisocket;
-										console.log('#216 >> Connection successful');
-										// clisocket.write('GET /node.js/rules HTTP/1.0\r\n\r\n');
-										// clisocket.pipe(process.stdout);
-										let responseBuffer = Buffer.alloc(args.requestBuffer.length);
-										args.requestBuffer.copy(responseBuffer);
-										responseBuffer[1] = RFC_1928_REPLIES.SUCCEEDED;
+								/* const clisocket = getRelaySocketPool(proxyHost, proxyPort); // 尝试复用 START
+								if(clisocket){
+									const responseBuffer = Buffer.alloc(args.requestBuffer.length);
+									args.requestBuffer.copy(responseBuffer);
+									responseBuffer[1] = RFC_1928_REPLIES.SUCCEEDED;
 
-										// write acknowledgement to client...
-										socket.write(responseBuffer, () => {
-											// listen for data bi-directionally
-											destination.pipe(socket);
-											socket.pipe(destination);
-										});
-										
-									}
-								);
+									// write acknowledgement to client...
+									socket.write(responseBuffer, () => {
+										// listen for data bi-directionally
+										clisocket.pipe(socket);
+										socket.pipe(clisocket);
+									});
+									self._bindSocketEvent({ args, connectionFilterDomain, destination: clisocket, end } )
+								}else{ */
+									const destHost = args.dst.addr;
+									const destPort = args.dst.port;
+									Client.connect(
+										{
+											host: destHost, // 'google.com'
+											port: destPort, // 80
+											proxyHost, // '127.0.0.1',
+											proxyPort, // 1080,
+											// eslint-disable-next-line sort-keys
+											auths
+										},
+										function (clisocket) {
+											// setRelaySocketPool(proxyHost, proxyPort, clisocket); // 尝试复用
+											// console.log('#216 >> Connection successful');
+											// clisocket.write('GET /node.js/rules HTTP/1.0\r\n\r\n');
+											// clisocket.pipe(process.stdout);
+											const responseBuffer = Buffer.alloc(args.requestBuffer.length);
+											args.requestBuffer.copy(responseBuffer);
+											responseBuffer[1] = RFC_1928_REPLIES.SUCCEEDED;
+	
+											// write acknowledgement to client...
+											socket.write(responseBuffer, () => {
+												// listen for data bi-directionally
+												clisocket.pipe(socket);
+												socket.pipe(clisocket);
+											});
+											self._bindSocketEvent({ args, connectionFilterDomain, destination: clisocket, end } )
+										}
+									);
+								/* }  // 尝试复用 START */
 								// 判断是否是中继节点 END
 							} else {
-								destination = net.createConnection(
+								const destination = net.createConnection(
 									args.dst.port,
 									args.dst.addr,
 									() => {
@@ -251,48 +303,8 @@ class SocksServer {
 										});
 									}
 								);
+								self._bindSocketEvent({ args, connectionFilterDomain, destination, end } )
 							}
-
-							// capture successful connection
-							destination.on('connect', () => {
-								let info = {
-									address : args.dst.addr,
-									port : args.dst.port
-								};
-
-								// emit connection event
-								self.server.emit(EVENTS.PROXY_CONNECT, info, destination);
-
-								// capture and emit proxied connection data
-								destination.on('data', (data) => {
-									self.server.emit(EVENTS.PROXY_DATA, data);
-								});
-
-								connectionFilterDomain.exit();
-							});
-
-							// capture connection errors and response appropriately
-							destination.on('error', (err) => {
-								// exit the connection filter domain
-								connectionFilterDomain.exit();
-
-								// notify of connection error
-								err.addr = args.dst.addr;
-								err.atyp = args.atyp;
-								err.port = args.dst.port;
-
-								self.server.emit(EVENTS.PROXY_ERROR, err);
-
-								if (err.code && err.code === 'EADDRNOTAVAIL') {
-									return end(RFC_1928_REPLIES.HOST_UNREACHABLE, args);
-								}
-
-								if (err.code && err.code === 'ECONNREFUSED') {
-									return end(RFC_1928_REPLIES.CONNECTION_REFUSED, args);
-								}
-
-								return end(RFC_1928_REPLIES.NETWORK_UNREACHABLE, args);
-							});
 
 						});
 
@@ -454,6 +466,50 @@ class SocksServer {
 			});
 		});
 	}
+}
+
+SocksServer.prototype._bindSocketEvent = function ( { args, connectionFilterDomain, destination, end } ) {
+	const self = this;
+	// capture successful connection
+	destination.on('connect', () => {
+		let info = {
+			address : args.dst.addr,
+			port : args.dst.port
+		};
+
+		// emit connection event
+		self.server.emit(EVENTS.PROXY_CONNECT, info, destination);
+
+		// capture and emit proxied connection data
+		destination.on('data', (data) => {
+			self.server.emit(EVENTS.PROXY_DATA, data);
+		});
+
+		connectionFilterDomain.exit();
+	});
+
+	// capture connection errors and response appropriately
+	destination.on('error', (err) => {
+		// exit the connection filter domain
+		connectionFilterDomain.exit();
+
+		// notify of connection error
+		err.addr = args.dst.addr;
+		err.atyp = args.atyp;
+		err.port = args.dst.port;
+
+		self.server.emit(EVENTS.PROXY_ERROR, err);
+
+		if (err.code && err.code === 'EADDRNOTAVAIL') {
+			return end(RFC_1928_REPLIES.HOST_UNREACHABLE, args);
+		}
+
+		if (err.code && err.code === 'ECONNREFUSED') {
+			return end(RFC_1928_REPLIES.CONNECTION_REFUSED, args);
+		}
+
+		return end(RFC_1928_REPLIES.NETWORK_UNREACHABLE, args);
+	});
 }
 
 exports.createServer = (options) => {

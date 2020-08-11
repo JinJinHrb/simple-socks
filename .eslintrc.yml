@@ -56,7 +56,7 @@
     no-case-declarations: 2
     no-cond-assign: 2
     no-confusing-arrow: 2
-    no-console: 2
+    no-console: 1
     no-const-assign: 2
     no-constant-condition: 2
     no-control-regex: 2
@@ -94,7 +94,7 @@
     no-lone-blocks: 2
     no-loop-func: 2
     no-magic-numbers:
-      - 2
+      - 0
       - ignore: [-1, 0, 1, 2]
         ignoreArrayIndexes: true
     no-mixed-requires:
