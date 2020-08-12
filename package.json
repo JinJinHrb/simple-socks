@@ -4,6 +4,7 @@
   "description": "proxies requests ",
   "main": "dist/socks5.js",
   "scripts": {
+    "start": "node bin/createRelayServer.js",
     "build": "gulp build",
     "lint": "gulp lint",
     "prepare": "gulp build",
