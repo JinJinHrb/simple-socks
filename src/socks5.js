@@ -244,7 +244,7 @@ class SocksServer {
 							if(!auth.username || !auth.password){
 								auths = [SOCKSV5_AUTH_NONE];
 							}else{
-								auths = [new UserPassword(auth.username, auth.password)];
+								auths = [new UserPassword(auth.username, auth.password), SOCKSV5_AUTH_NONE];
 							}
 							if(proxyHost && proxyPort){
 								/* const clisocket = getRelaySocketPool(proxyHost, proxyPort); // 尝试复用 START
