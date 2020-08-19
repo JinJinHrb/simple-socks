@@ -1,17 +1,16 @@
+const socks5 = require('../dist/socks5')
+
 const Config = require('../config.js');
 const port = Config.port;
 const auth = Config.auth || {};
 
-const
-	socks5 = require('../dist/socks5'),
-	server = socks5.createServer({
+const server = socks5.createServer({
 		authenticate : (username, password, socket, callback) => {
 			// verify username/password
 			if (auth.username && auth.password && username !== auth.username || password !== auth.password) {
 				// respond with auth failure (can be any error)
 				return setImmediate(callback, new Error('invalid credentials'));
 			}
-
 			// return successful authentication
 			return setImmediate(callback);
 		}

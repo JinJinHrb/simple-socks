@@ -11,9 +11,8 @@
 	curl http://www.baidu.com --socks5 127.0.0.1:1080
 */
 
-const
-	socks5 = require('../src/socks5'),
-	server = socks5.createServer();
+const socks5 = require('../src/socks5');
+const server = socks5.createServer();
 
 const Config = require('../config.js');
 const port = Config.port;
