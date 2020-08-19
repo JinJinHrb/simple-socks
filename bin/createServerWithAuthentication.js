@@ -1,9 +1,13 @@
+const Config = require('../config.js');
+const port = Config.port;
+const auth = Config.auth || {};
+
 const
 	socks5 = require('../dist/socks5'),
 	server = socks5.createServer({
-		authenticate : function (username, password, socket, callback) {
+		authenticate : (username, password, socket, callback) => {
 			// verify username/password
-			if (username !== 'foo' || password !== 'bar') {
+			if (auth.username && auth.password && username !== auth.username || password !== auth.password) {
 				// respond with auth failure (can be any error)
 				return setImmediate(callback, new Error('invalid credentials'));
 			}
@@ -14,7 +18,7 @@ const
 	});
 
 // start listening!
-server.listen(1080);
+server.listen(port);
 
 server.on('handshake', function () {
 	console.log();

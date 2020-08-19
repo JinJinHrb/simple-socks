@@ -3,6 +3,8 @@
 	【测试步骤】
 	(1) 创建 socks5 服务器（port=1081）
 	node "/Users/alexwang/Documents/workspace/github/simple-socks-copy/examples/createServer.js"
+	或
+	node "/Users/alexwang/Documents/workspace/github/simple-socks-jinjinHrb2/bin/createServerWithAuthentication.js"
 	
 	(2) 创建 TCP 转发
 	// node "/Users/alexwang/Documents/workspace/github/simple-socks-copy/examples/forwarder.js" 1080 127.0.0.1:1081
@@ -13,13 +15,18 @@
 	curl http://www.baidu.com --socks5 127.0.0.1:1080
 
 */
+const Config = require('../config.js');
+const connectionRelay = Config.relay; // { proxyHost: '127.0.0.1', proxyPort: 1081 }
+
 const socks5 = require('../src/socks5');
 const server = socks5.createServer({
-	connectionRelay: { proxyHost: '127.0.0.1', proxyPort: 1081 }
-})
+	connectionRelay
+});
+const hdlUtil = require('../src/helpers/hdlUtil');
 
-	// start listening!
-server.listen(1080);
+// start listening!
+const port = hdlUtil.getDeepVal(Config, 'port');
+server.listen(port);
 
 server.on('handshake', function (socket) {
 	console.log();

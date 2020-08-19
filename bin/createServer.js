@@ -15,8 +15,11 @@ const
 	socks5 = require('../src/socks5'),
 	server = socks5.createServer();
 
+const Config = require('../config.js');
+const port = Config.port;
+
 // start listening!
-server.listen(1080);
+server.listen(port);
 
 server.on('handshake', function (socket) {
 	console.log();
