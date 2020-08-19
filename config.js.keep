@@ -1,0 +1,20 @@
+/*
+ * config.js 示例
+ * 实际使用时需在根目录下配置 config.js
+ */
+const RTN = {
+    auth: {
+        password: '',
+        username: ''
+    },
+    port: 1080,
+    relay: { // 作为中间跳板
+        auth: {
+            password: '',
+            username: ''
+        },
+        proxyHost: '127.0.0.1', 
+        proxyPort: 1081
+    }
+}
+module.exports = RTN;
