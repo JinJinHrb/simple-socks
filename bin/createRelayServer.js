@@ -8,11 +8,12 @@
 	
 	(2) 创建 TCP 转发
 	// node "/Users/alexwang/Documents/workspace/github/simple-socks-copy/examples/forwarder.js" 1080 127.0.0.1:1081
-	// supervisor --inspect examples/createRelayServer.js
-	node examples/createRelayServer.js
+	// supervisor --inspect bin/createRelayServer.js
+	node bin/createRelayServer.js
 
 	(3) 测试网页
 	curl http://www.baidu.com --socks5 127.0.0.1:1080
+	curl http://info.so.com/feedback.html --socks5 127.0.0.1:1080
 
 */
 const Config = require('../config.js');

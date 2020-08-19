@@ -15,6 +15,7 @@ const domain = require('domain');
 const net = require('net');
 const Client = require('./socksv5/client.js');
 const SOCKSV5_AUTH_NONE = require('./socksv5/auth/None.js')();
+const UserPassword = require('./socksv5/auth/UserPassword.js');
 // const hdlUtil = require('./helpers/hdlUtil.js');
 
 	// module specific events
@@ -238,7 +239,13 @@ class SocksServer {
 
 						const connectionFilterCallback = connectionFilterDomain.intercept(() => {
 							// 判断是否是中继节点 START
-							const { proxyHost, proxyPort, auths = [SOCKSV5_AUTH_NONE] } = connectionRelay;
+							const { proxyHost, proxyPort, auth = {} } = connectionRelay;
+							let auths;
+							if(!auth.username || !auth.password){
+								auths = [SOCKSV5_AUTH_NONE];
+							}else{
+								auths = [new UserPassword(auth.username, auth.password)];
+							}
 							if(proxyHost && proxyPort){
 								/* const clisocket = getRelaySocketPool(proxyHost, proxyPort); // 尝试复用 START
 								if(clisocket){
