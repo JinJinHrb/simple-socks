@@ -5,7 +5,7 @@
 /* eslint-disable sort-vars */
 const
 	dns = require('dns'),
-	socks5 = require('../dist/socks5'),
+	socks5 = require('../src/socks5'),
 	server = socks5.createServer({
 		connectionFilter : function (destination, origin, callback) {
 			console.log('Attempting to connect to...');

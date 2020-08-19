@@ -1,4 +1,4 @@
-const socks5 = require('../dist/socks5')
+const socks5 = require('../src/socks5');
 
 const Config = require('../config.js');
 const port = Config.port;
