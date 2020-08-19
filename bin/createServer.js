@@ -1,16 +1,3 @@
-
-/* 
-	【测试步骤】
-	(1) 创建 socks5 服务器（port=1081）
-	node "/Users/alexwang/Documents/workspace/github/simple-socks-copy/bin/createServer.js"
-	
-	(2) 创建 TCP 转发
-	node "/Users/alexwang/Documents/workspace/github/simple-socks-copy/bin/forwarder.js" 1080 127.0.0.1:1081
-
-	(3) 测试网页
-	curl http://www.baidu.com --socks5 127.0.0.1:1080
-*/
-
 const socks5 = require('../src/socks5');
 const server = socks5.createServer();
 

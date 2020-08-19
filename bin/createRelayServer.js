@@ -1,24 +1,3 @@
-
-/* 
-	【测试步骤】
-	(1) 创建 socks5 服务器（port=1081）
-	node "/Users/alexwang/Documents/workspace/github/simple-socks-copy/examples/createServer.js"
-	或
-	node "/Users/alexwang/Documents/workspace/github/simple-socks-jinjinHrb2/bin/createServerWithAuthentication.js"
-	
-	(2) 创建 TCP 转发
-	// node "/Users/alexwang/Documents/workspace/github/simple-socks-copy/examples/forwarder.js" 1080 127.0.0.1:1081
-	// supervisor --inspect "/Users/alexwang/Documents/workspace/github/simple-socks-jinjinHrb/bin/createRelayServer.js"
-	node "/Users/alexwang/Documents/workspace/github/simple-socks-jinjinHrb/bin/createRelayServer.js"
-
-	(3) 测试网页
-	curl http://www.baidu.com --socks5 127.0.0.1:1080
-	curl http://info.so.com/feedback.html --socks5 127.0.0.1:1080
-
-	(4) 测试带用户名/密码服务器
-	curl -x socks5://ivisa.vip:F2e1AeC06f3993FB@localhost:1099/ "https://www.so.com/"
-
-*/
 const Config = require('../config.js');
 const connectionRelay = Config.relay; // { proxyHost: '127.0.0.1', proxyPort: 1081 }
 
