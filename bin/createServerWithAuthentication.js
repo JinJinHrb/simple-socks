@@ -5,16 +5,16 @@ const port = Config.port;
 const auth = Config.auth || {};
 
 const server = socks5.createServer({
-		authenticate : (username, password, socket, callback) => {
-			// verify username/password
-			if (auth.username && auth.password && username !== auth.username || password !== auth.password) {
-				// respond with auth failure (can be any error)
-				return setImmediate(callback, new Error('invalid credentials'));
-			}
-			// return successful authentication
-			return setImmediate(callback);
+	authenticate : (username, password, socket, callback) => {
+		// verify username/password
+		if (auth.username && auth.password && username !== auth.username || password !== auth.password) {
+			// respond with auth failure (can be any error)
+			return setImmediate(callback, new Error('invalid credentials'));
 		}
-	});
+		// return successful authentication
+		return setImmediate(callback);
+	}
+});
 
 // start listening!
 server.listen(port);
