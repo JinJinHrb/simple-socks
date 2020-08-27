@@ -10,6 +10,7 @@
 	// node "/Users/alexwang/Documents/workspace/github/simple-socks-copy/examples/forwarder.js" 1080 127.0.0.1:1081
 	// supervisor --inspect "/Users/alexwang/Documents/workspace/github/simple-socks-jinjinHrb/bin/createRelayServer.js"
 	node "/Users/alexwang/Documents/workspace/github/simple-socks-jinjinHrb/bin/createRelayServer.js"
+	node "/Users/alexwang/Documents/workspace/github/simple-socks-jinjinHrb/bin/masterService.js"
 
 	(3) 测试网页
 	curl http://www.baidu.com --socks5 127.0.0.1:1080
